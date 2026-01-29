@@ -1,4 +1,10 @@
-type Envelope = Record<string, unknown>
+export type Envelope = {
+  [key: string]: any
+  correlationId: string
+  isCommand: boolean
+  isAdmin: boolean
+}
+
 type Constructor<T> = new (...args: any[]) => T
 type DependencyType = 'singleton' | 'request-scoped'
 type Next = () => Promise<void> | void

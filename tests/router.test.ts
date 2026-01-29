@@ -1,5 +1,6 @@
-import { createRouter } from '../lib/router'
 import { expect, test } from 'bun:test'
+import { createRouter } from '../lib/router'
+import { createEnvelope } from '../lib/envelope'
 
 test('dependency injector injects correct class instances into middleware and route', async () => {
   const router = createRouter()
@@ -43,7 +44,7 @@ test('dependency injector injects correct class instances into middleware and ro
 test('envelope passed around by middleware pipeline and route handler can be mutated correctly', async () => {
   const router = createRouter()
 
-  let seenInRoute: Record<string, unknown> = {}
+  let seenInRoute: any = {} // vaiable to hold evenlope data, that will be assigned via a dispatch action
 
   router.registerMiddleware('v1.logger', [], async ({ envelope, next }) => {
     envelope.step1 = true
@@ -59,26 +60,34 @@ test('envelope passed around by middleware pipeline and route handler can be mut
     'v1.test',
     [],
     async ({ envelope }) => {
-      seenInRoute = { ...envelope }
+      seenInRoute = structuredClone(envelope)
     },
     ['v1.logger']
   )
 
-  const envelope: Record<string, unknown> = {}
+  const envelope = createEnvelope()
+  envelope.step1 = 'howdy'
+  envelope.step2 = 'hi bro'
   await router.dispatch('v1.test', envelope)
 
   // --- assertions ---
+  // Middleware mutated the original envelope
   expect(envelope.step1).toBe(true)
   expect(envelope.step2).toBe(true)
 
-  expect(seenInRoute).toEqual({
-    step1: true,
-    step2: true
-  })
+  // Route handler saw the mutated values
+  expect(seenInRoute.step1).toBe(true)
+  expect(seenInRoute.step2).toBe(true)
+
+  // Base envelope properties are preserved
+  expect(seenInRoute.correlationId).toBeDefined()
+  expect(seenInRoute.isCommand).toBe(false)
+  expect(seenInRoute.isAdmin).toBe(false)
 })
 
 test('error handler is invoked when middleware throws and receives correct context', async () => {
   const router = createRouter()
+  const envelope = createEnvelope()
 
   const seen: {
     error?: unknown
@@ -110,8 +119,6 @@ test('error handler is invoked when middleware throws and receives correct conte
     undefined,
     { secure: true }
   )
-
-  const envelope: Record<string, unknown> = {}
 
   await expect(router.dispatch('v1.test', envelope)).resolves.toBeUndefined()
 
