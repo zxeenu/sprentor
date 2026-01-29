@@ -12,4 +12,10 @@ To run:
 bun run index.ts
 ```
 
+To test continuously:
+
+```bash
+bun test --watch
+```
+
 This project was created using `bun init` in bun v1.3.6. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.

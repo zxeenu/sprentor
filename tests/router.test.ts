@@ -1,7 +1,7 @@
 import { createRouter } from '../lib/router'
 import { expect, test } from 'bun:test'
 
-test('DI injects correct class instances into middleware and route', async () => {
+test('dependency injector injects correct class instances into middleware and route', async () => {
   const router = createRouter()
 
   class Logger {
@@ -40,7 +40,7 @@ test('DI injects correct class instances into middleware and route', async () =>
   expect(middlewareLogger).toBe(routeLogger)
 })
 
-test('Envelope passed around by middleware pipeline and route handler can be mutated correctly', async () => {
+test('envelope passed around by middleware pipeline and route handler can be mutated correctly', async () => {
   const router = createRouter()
 
   let seenInRoute: Record<string, unknown> = {}
@@ -75,4 +75,56 @@ test('Envelope passed around by middleware pipeline and route handler can be mut
     step1: true,
     step2: true
   })
+})
+
+test('error handler is invoked when middleware throws and receives correct context', async () => {
+  const router = createRouter()
+
+  const seen: {
+    error?: unknown
+    envelope?: Record<string, unknown>
+    routeSlug?: string
+    meta?: any
+  } = {}
+
+  router.registerErrorHandler(async ({ error, envelope, routeSlug, meta, next }) => {
+    seen.error = error
+    seen.envelope = envelope
+    seen.routeSlug = routeSlug
+    seen.meta = meta
+    // do NOT call next() — stop error pipeline
+  })
+
+  router.registerMiddleware('v1.fail', [], async ({ envelope }) => {
+    envelope.beforeCrash = true
+    throw new Error('boom')
+  })
+
+  router.registerRoute(
+    'v1.test',
+    [],
+    async ({ envelope }) => {
+      envelope.routeRan = true // should NEVER happen
+    },
+    ['v1.fail'],
+    undefined,
+    { secure: true }
+  )
+
+  const envelope: Record<string, unknown> = {}
+
+  await expect(router.dispatch('v1.test', envelope)).resolves.toBeUndefined()
+
+  // --- assertions ---
+  expect(seen.error).toBeInstanceOf(Error)
+  expect((seen.error as Error).message).toBe('boom')
+
+  expect(seen.routeSlug).toBe('v1.test')
+  expect(seen.meta).toEqual({ secure: true })
+
+  // envelope mutation before crash is preserved
+  expect(envelope.beforeCrash).toBe(true)
+
+  // route must not run
+  expect(envelope.routeRan).toBeUndefined()
 })

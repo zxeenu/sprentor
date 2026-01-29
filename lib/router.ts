@@ -20,6 +20,8 @@ type MiddlewareEntry<T extends Constructor<any>[]> = {
   meta: any
 }
 
+type ErrorHandler = (args: { error: unknown; envelope: Envelope; meta?: any; routeSlug?: RouterSlug; next: () => Promise<void> | void }) => Promise<void> | void
+
 type DependencyEntry = { type: DependencyType; object: any }
 
 export function createRouter() {
@@ -29,6 +31,11 @@ export function createRouter() {
   const routeAfterMiddlewareMap = new Map<RouterSlug, MiddlewareSlug[]>()
   const middlewareMap = new Map<MiddlewareSlug, MiddlewareEntry<any>[]>()
   const dependencyMap = new Map<any, DependencyEntry>()
+  const errorHandlers: ErrorHandler[] = []
+
+  function registerErrorHandler(handler: ErrorHandler) {
+    errorHandlers.push(handler)
+  }
 
   function registerDependency<T>(dependency: Constructor<T>, type: DependencyType) {
     if (dependencyMap.has(dependency)) {
@@ -122,7 +129,31 @@ export function createRouter() {
   //   entry.callback({ envelope, deps: resolvedDeps, meta: entry.meta })
   // }
 
-  async function dispatch<T extends Constructor<any>[]>(slug: RouterSlug, envelope: Envelope) {
+  async function runErrorHandlers(error: unknown, envelope: Envelope, meta?: any, routeSlug?: RouterSlug) {
+    let idx = -1
+    const run = async (i: number): Promise<void> => {
+      if (i <= idx) throw new Error('next() called multiple times in error handler')
+      idx = i
+      if (i === errorHandlers.length) return
+      const handler = errorHandlers.at(i)
+
+      if (!handler) {
+        throw new Error('Error handler could not be found! Fatal error!')
+      }
+
+      await handler({
+        error,
+        envelope,
+        meta,
+        routeSlug,
+        next: async () => run(i + 1)
+      })
+    }
+
+    await run(0)
+  }
+
+  async function _dispatch<T extends Constructor<any>[]>(slug: RouterSlug, envelope: Envelope) {
     const route = routeMap.get(slug) as RouteEntry<T> | undefined
     if (!route) {
       throw new Error('Route not found')
@@ -163,7 +194,7 @@ export function createRouter() {
           [K in keyof T]: T[K] extends Constructor<infer R> ? R : never
         }
 
-        console.log(`DISPATCH : [${slug}] -> ${JSON.stringify(route.meta, null, 2)}`)
+        // console.log(`DISPATCH : [${slug}] -> ${JSON.stringify(route.meta, null, 2)}`)
         await route.callback({
           envelope,
           deps,
@@ -223,13 +254,22 @@ export function createRouter() {
     }
 
     await runBeforeMiddleware(0)
-
-    // try {
-    //   runBeforeMiddleware(0)
-    // } catch (err) {
-    //   runErrorMiddleware(err)
-    // }
   }
 
-  return { registerRoute, registerMiddleware, registerDependency, dispatch }
+  async function dispatch<T extends Constructor<any>[]>(slug: RouterSlug, envelope: Envelope) {
+    try {
+      await _dispatch<T>(slug, envelope)
+    } catch (err) {
+      const route = routeMap.get(slug) as RouteEntry<T> | undefined
+      try {
+        await runErrorHandlers(err, envelope, route?.meta, slug)
+      } catch (handlerErr) {
+        // Error handler threw or called next() incorrectly; rethrow the original or handler error
+        console.error(err)
+        throw handlerErr ?? err
+      }
+    }
+  }
+
+  return { registerRoute, registerMiddleware, registerDependency, dispatch, registerErrorHandler }
 }
