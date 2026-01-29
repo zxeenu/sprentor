@@ -1,19 +1,19 @@
 type Envelope = Record<string, unknown>
 type Constructor<T> = new (...args: any[]) => T
 type DependencyType = 'singleton' | 'request-scoped'
-type Next = () => void
+type Next = () => Promise<void> | void
 type RouterSlug = `v${number}.${string}`
 type MiddlewareSlug = `v${number}.${string}`
-type HandlerCallbackWithDeps<T extends any[]> = (args: { envelope: Envelope; deps: T; meta?: any }) => void
+type HandlerCallbackWithDeps<T extends any[]> = (args: { envelope: Envelope; deps: T; meta?: any }) => Promise<void> | void
 
-type RouteHandler<T extends any[]> = (args: { envelope: Envelope; deps: T; meta?: any }) => void
+type RouteHandler<T extends any[]> = (args: { envelope: Envelope; deps: T; meta?: any }) => Promise<void> | void
 type RouteEntry<T extends Constructor<any>[]> = {
   callback: RouteHandler<{ [K in keyof T]: T[K] extends Constructor<infer R> ? R : never }>
   depsConstructors: T
   meta: any
 }
 
-type MiddlewareHandler<T extends any[]> = (args: { envelope: Envelope; deps: T; meta?: any; next: Next }) => void
+type MiddlewareHandler<T extends any[]> = (args: { envelope: Envelope; deps: T; meta?: any; next: Next }) => Promise<void> | void
 type MiddlewareEntry<T extends Constructor<any>[]> = {
   callback: MiddlewareHandler<{ [K in keyof T]: T[K] extends Constructor<infer R> ? R : never }>
   depsConstructors: T
@@ -25,8 +25,8 @@ type DependencyEntry = { type: DependencyType; object: any }
 export function createRouter() {
   // amazing how you can mimic oop behaviour without any actual oop syntax
   const routeMap = new Map<RouterSlug, RouteEntry<any>>()
-  const routeBeforeMiddlewareMap = new Map<RouterSlug, RouterSlug[]>()
-  const routeAfterMiddlewareMap = new Map<RouterSlug, RouterSlug[]>()
+  const routeBeforeMiddlewareMap = new Map<RouterSlug, MiddlewareSlug[]>()
+  const routeAfterMiddlewareMap = new Map<RouterSlug, MiddlewareSlug[]>()
   const middlewareMap = new Map<MiddlewareSlug, MiddlewareEntry<any>[]>()
   const dependencyMap = new Map<any, DependencyEntry>()
 
@@ -122,7 +122,7 @@ export function createRouter() {
   //   entry.callback({ envelope, deps: resolvedDeps, meta: entry.meta })
   // }
 
-  function dispatch<T extends Constructor<any>[]>(slug: RouterSlug, envelope: Envelope) {
+  async function dispatch<T extends Constructor<any>[]>(slug: RouterSlug, envelope: Envelope) {
     const route = routeMap.get(slug) as RouteEntry<T> | undefined
     if (!route) {
       throw new Error('Route not found')
@@ -153,7 +153,7 @@ export function createRouter() {
     }
 
     let beforeIndex = -1
-    const runBeforeMiddleware = (i: number) => {
+    const runBeforeMiddleware = async (i: number) => {
       if (i <= beforeIndex) throw new Error('next() called multiple times')
       beforeIndex = i
 
@@ -164,14 +164,14 @@ export function createRouter() {
         }
 
         console.log(`DISPATCH : [${slug}] -> ${JSON.stringify(route.meta, null, 2)}`)
-        route.callback({
+        await route.callback({
           envelope,
           deps,
           meta: route.meta
         })
 
         // After route completes, run after middleware chain
-        runAfterMiddleware(0)
+        await runAfterMiddleware(0)
         return
       }
 
@@ -180,18 +180,22 @@ export function createRouter() {
         throw new Error('Middleware before route handling attempted')
       }
 
-      const deps = mw.depsConstructors.map(resolveDependency)
+      // const deps = mw.depsConstructors.map(resolveDependency)
+      // lots just doing this to make ts happy
+      const deps = mw.depsConstructors.map(resolveDependency) as {
+        [K in keyof typeof mw.depsConstructors]: (typeof mw.depsConstructors)[K] extends Constructor<infer R> ? R : never
+      }[number][]
 
-      mw.callback({
+      await mw.callback({
         envelope,
         deps,
         meta: mw.meta,
-        next: () => runBeforeMiddleware(i + 1)
+        next: async () => await runBeforeMiddleware(i + 1)
       })
     }
 
     let afterIndex = -1
-    const runAfterMiddleware = (i: number) => {
+    const runAfterMiddleware = async (i: number) => {
       if (i <= afterIndex) throw new Error('next() called multiple times')
       afterIndex = i
 
@@ -204,17 +208,21 @@ export function createRouter() {
         throw new Error('Middleware after route handling attempted')
       }
 
-      const deps = mw.depsConstructors.map(resolveDependency)
+      // const deps = mw.depsConstructors.map(resolveDependency)
+      // lots just doing this to make ts happy
+      const deps = mw.depsConstructors.map(resolveDependency) as {
+        [K in keyof typeof mw.depsConstructors]: (typeof mw.depsConstructors)[K] extends Constructor<infer R> ? R : never
+      }[number][]
 
-      mw.callback({
+      await mw.callback({
         envelope,
         deps,
         meta: mw.meta,
-        next: () => runAfterMiddleware(i + 1)
+        next: async () => await runAfterMiddleware(i + 1)
       })
     }
 
-    runBeforeMiddleware(0)
+    await runBeforeMiddleware(0)
 
     // try {
     //   runBeforeMiddleware(0)

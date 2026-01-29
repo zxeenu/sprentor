@@ -26,7 +26,7 @@ router.registerDependency(AuthService, 'singleton')
 router.registerDependency(Service, 'request-scoped')
 
 // multiple middlewares can be registered via the same slug
-router.registerMiddleware('v1.auth', [AuthService], ({ deps: [auth], envelope, next }) => {
+router.registerMiddleware('v1.auth', [AuthService], async ({ deps: [auth], envelope, next }) => {
   if (!auth.isAuthenticated(envelope)) {
     throw new Error('Unauthorized')
   }
@@ -34,12 +34,12 @@ router.registerMiddleware('v1.auth', [AuthService], ({ deps: [auth], envelope, n
   envelope['test'] = 'shove some data inside'
   next()
 })
-router.registerMiddleware('v1.auth', [AuthService], ({ deps: [auth], envelope, next }) => {
+router.registerMiddleware('v1.auth', [AuthService], async ({ deps: [auth], envelope, next }) => {
   envelope['test2'] = 'shove some data inside'
   next()
 })
 
-router.registerMiddleware('v1.response', [AuthService], ({ deps: [auth], envelope, next }) => {
+router.registerMiddleware('v1.response', [AuthService], async ({ deps: [auth], envelope, next }) => {
   console.log('response-log', envelope)
   next()
 })
@@ -48,7 +48,7 @@ router.registerMiddleware('v1.response', [AuthService], ({ deps: [auth], envelop
 router.registerRoute(
   'v1.test',
   [Logger, Service],
-  ({ envelope, deps: [logger, service], meta }) => {
+  async ({ envelope, deps: [logger, service], meta }) => {
     logger.log('Dispatching test route')
     service.doSomething()
     console.log(envelope)
