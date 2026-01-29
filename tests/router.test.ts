@@ -31,7 +31,8 @@ test('dependency injector injects correct class instances into middleware and ro
     ['v1.logger']
   )
 
-  await router.dispatch('v1.test', {})
+  const envelope = createEnvelope()
+  await router.dispatch('v1.test', envelope)
 
   // --- assertions ---
   expect(middlewareLogger).toBeInstanceOf(Logger)
