@@ -1,3 +1,4 @@
+import { createEnvelope } from './lib/envelope'
 import { createRouter } from './lib/router'
 
 const router = createRouter()
@@ -58,5 +59,5 @@ router.registerRoute(
 )
 
 // dispatch route
-router.dispatch('v1.test', {})
-router.dispatch('v1.test', {})
+router.dispatch('v1.test', createEnvelope())
+router.dispatch('v1.test', createEnvelope())
