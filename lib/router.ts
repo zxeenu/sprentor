@@ -1,5 +1,7 @@
 export type Envelope = {
   [key: string]: any
+  username: string
+  messageText: string
   correlationId: string
   isCommand: boolean
   isAdmin: boolean

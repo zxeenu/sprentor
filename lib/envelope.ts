@@ -5,7 +5,9 @@ export function createEnvelope(data?: { [key: string]: any }): Envelope {
   return {
     ...data,
     correlationId: nanoid(),
-    isCommand: data?.kind === 'message' && data?.text.startsWith('.'),
-    isAdmin: false
+    isCommand: data?.text.startsWith('.'),
+    isAdmin: false,
+    username: '',
+    messageText: ''
   }
 }
