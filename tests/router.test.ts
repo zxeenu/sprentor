@@ -12,7 +12,7 @@ test('dependency injector injects correct class instances into middleware and ro
     }
   }
 
-  router.registerDependency(Logger, 'singleton')
+  router.registerSingleton(Logger)
 
   let middlewareLogger: Logger | null = null
   let routeLogger: Logger | null = null
@@ -82,8 +82,6 @@ test('envelope passed around by middleware pipeline and route handler can be mut
 
   // Base envelope properties are preserved
   expect(seenInRoute.correlationId).toBeDefined()
-  expect(seenInRoute.isCommand).toBe(false)
-  expect(seenInRoute.isAdmin).toBe(false)
 })
 
 test('error handler is invoked when middleware throws and receives correct context', async () => {

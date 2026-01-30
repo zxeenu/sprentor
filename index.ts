@@ -28,9 +28,9 @@ class AuthService {
 // -----------------------------
 // Register dependencies
 // -----------------------------
-router.registerDependency(Logger, 'singleton')
-router.registerDependency(AuthService, 'singleton')
-router.registerDependency(Service, 'request-scoped')
+router.registerSingleton(Logger)
+router.registerSingleton(AuthService)
+router.registerDependency(Service, 'request-scoped', () => Service)
 
 // -----------------------------
 // Middleware

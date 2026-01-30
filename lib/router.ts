@@ -30,7 +30,8 @@ type MiddlewareEntry<T extends Constructor<any>[]> = {
 
 type ErrorHandler = (args: { error: unknown; envelope: Envelope; meta?: any; routeSlug?: RouterSlug; next: () => Promise<void> | void }) => Promise<void> | void
 
-type DependencyEntry = { type: DependencyType; object: any }
+type DependencyToken = string | Constructor<any>
+type DependencyFactory = { type: DependencyType; factory: () => any; instance?: any }
 
 export function createRouter() {
   // amazing how you can mimic oop behaviour without any actual oop syntax
@@ -38,38 +39,53 @@ export function createRouter() {
   const routeBeforeMiddlewareMap = new Map<RouterSlug, MiddlewareSlug[]>()
   const routeAfterMiddlewareMap = new Map<RouterSlug, MiddlewareSlug[]>()
   const middlewareMap = new Map<MiddlewareSlug, MiddlewareEntry<any>[]>()
-  const dependencyMap = new Map<any, DependencyEntry>()
+  const dependencyMap = new Map<DependencyToken, DependencyFactory>()
   const errorHandlers: ErrorHandler[] = []
 
   function registerErrorHandler(handler: ErrorHandler) {
     errorHandlers.push(handler)
   }
 
-  function registerDependency<T>(dependency: Constructor<T>, type: DependencyType) {
-    if (dependencyMap.has(dependency)) {
+  function registerDependency(token: DependencyToken, type: DependencyType, factory: () => any) {
+    if (dependencyMap.has(token)) {
       throw new Error('Dependency already registered')
     }
-    dependencyMap.set(dependency, { type, object: dependency })
+    dependencyMap.set(token, { type, factory })
   }
 
-  function resolveDependency(depConstructor: any): any {
-    const entry = dependencyMap.get(depConstructor)
+  function registerSingleton(token: DependencyToken, factory?: () => any) {
+    if (dependencyMap.has(token)) {
+      throw new Error('Dependency already registered')
+    }
+
+    let resolvedFactory: () => any
+
+    if (factory) {
+      resolvedFactory = factory
+    } else {
+      if (typeof token === 'string') {
+        throw new Error('String token requires a factory callback')
+      }
+      resolvedFactory = () => new token() // safe because token is Constructor<any>
+    }
+
+    dependencyMap.set(token, { type: 'singleton', factory: resolvedFactory })
+  }
+
+  function resolveDependency(token: DependencyToken) {
+    const entry = dependencyMap.get(token)
     if (!entry) {
-      throw new Error(`Dependency ${depConstructor} not registered`)
+      throw new Error(`Dependency ${token} not registered`)
     }
 
     if (entry.type === 'singleton') {
-      if (typeof entry.object === 'function') {
-        const instance = new entry.object()
-        entry.object = instance
-        dependencyMap.set(depConstructor, entry)
+      if (!entry.instance) {
+        entry.instance = entry.factory()
       }
-      return entry.object
-    } else if (entry.type === 'request-scoped') {
-      return new entry.object()
+      return entry.instance
     }
 
-    throw new Error('Unknown dependency type')
+    return entry.factory()
   }
 
   function registerRoute<T extends Constructor<any>[]>(
@@ -279,5 +295,5 @@ export function createRouter() {
     }
   }
 
-  return { registerRoute, registerMiddleware, registerDependency, dispatch, registerErrorHandler }
+  return { registerRoute, registerMiddleware, registerDependency, dispatch, registerErrorHandler, registerSingleton, resolveDependency }
 }
