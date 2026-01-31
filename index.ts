@@ -1,7 +1,7 @@
 import { TelegramClient } from '@mtcute/bun'
 import { Dispatcher, MessageContext } from '@mtcute/dispatcher'
 import { Subject, timer } from 'rxjs'
-import { map, filter, scan, share, tap, mergeMap, take, withLatestFrom } from 'rxjs/operators'
+import { filter, map, mergeMap, scan, share, tap, withLatestFrom } from 'rxjs/operators'
 import { createEnvelope } from './lib/envelope'
 import { createRouter } from './lib/router'
 
@@ -30,25 +30,31 @@ class AuthService {
 // -----------------------------
 router.registerSingleton(Logger)
 router.registerSingleton(AuthService)
-router.registerDependency(Service, 'request-scoped', () => Service)
+// request scope dep resolution is broken. fix later
+// router.registerDependency(Service, 'request-scoped', () => Service)
+router.registerSingleton(Service)
 
 // -----------------------------
 // Middleware
 // -----------------------------
 router.registerMiddleware('v1.auth', [AuthService], async ({ deps: [auth], envelope, next }) => {
   if (!auth.isAuthenticated(envelope)) throw new Error('Unauthorized')
-  envelope['test'] = 'shove some data inside'
+  envelope['v1.auth.1'] = 'hallo'
   next()
 })
 
 router.registerMiddleware('v1.auth', [AuthService], async ({ deps: [auth], envelope, next }) => {
-  envelope['test2'] = 'shove some data inside'
+  envelope['v1.auth.2'] = 'i saw this'
   next()
 })
 
 router.registerMiddleware('v1.response', [AuthService], async ({ deps: [auth], envelope, next }) => {
   console.log('response-log', envelope)
   next()
+})
+
+router.registerErrorHandler((obj) => {
+  console.log('Something went wrong...', obj)
 })
 
 // -----------------------------
@@ -58,9 +64,10 @@ router.registerRoute(
   'v1.download_stream_video',
   [Logger, Service],
   async ({ envelope, deps: [logger, service] }) => {
-    logger.log('Dispatching test route')
-    service.doSomething()
-    console.log(envelope)
+    // logger.log('Dispatching test route')
+    // service.doSomething()
+    // console.log(envelope)
+    // throw new Error('fuck you bro')
   },
   ['v1.auth'],
   ['v1.response']
@@ -72,10 +79,6 @@ router.registerRoute(
 const COMMAND_HANDLERS = {
   '.dl': 'v1.download_stream_video'
 } as const
-
-// Dispatch a couple of test routes
-router.dispatch('v1.test', createEnvelope())
-router.dispatch('v1.test', createEnvelope())
 
 // -----------------------------
 // Telegram client
@@ -107,8 +110,21 @@ const updates$ = mtproto$.pipe(
 // -----------------------------
 // Business logic: mark failed messages
 // -----------------------------
-// TODO: do initial checks to see if this is something that is worth computing. fail it if not.
-const processed$ = updates$.pipe(map((msg) => ({ ...msg, failed: msg?.messageText.includes('fail') ?? false })))
+const processed$ = updates$.pipe(
+  mergeMap(async (env) => {
+    const wordSegments = env.messageText.split(' ')
+    const commandHandler = wordSegments.at(0)
+    const route = COMMAND_HANDLERS[commandHandler as keyof typeof COMMAND_HANDLERS]
+    if (!route) {
+      console.warn('No route for', env)
+      return env
+    }
+
+    await router.dispatch(route, env)
+    return env
+  }, 1),
+  share()
+)
 
 // -----------------------------
 // Compute per-user error rate
@@ -166,28 +182,19 @@ const adaptiveThrottled$ = processed$.pipe(
     // optional: use timer for visual delay
     return timer(delayMs).pipe(map(() => env))
   }),
-  tap((env) => console.log('Processed:', env.messageText)),
-  tap((env) => {
-    const wordSegments = env.messageText.split(' ')
-    const commandHandler = wordSegments.at(0)
-
-    if (!commandHandler) {
-      return
-    }
-
-    const commandHandleCallback = COMMAND_HANDLERS?.[commandHandler as keyof typeof COMMAND_HANDLERS]
-    if (!commandHandleCallback) {
-      return
-    }
-
-    router.dispatch(commandHandleCallback, env)
-  })
+  tap((env) => console.log('Processed:', env.messageText))
 )
 
 // -----------------------------
 // Hook into Telegram messages
 // -----------------------------
-dp.onNewMessage((msg) => mtproto$.next(msg))
+dp.onNewMessage((msg) => {
+  try {
+    mtproto$.next(msg)
+  } catch (err) {
+    console.error('Failed to push update:', err)
+  }
+})
 
 // -----------------------------
 // Start Telegram client

@@ -5,6 +5,8 @@ export type Envelope = {
   correlationId: string
   isCommand: boolean
   isAdmin: boolean
+  failed: boolean
+  errors: unknown[]
 }
 
 type Constructor<T> = new (...args: any[]) => T
@@ -14,7 +16,7 @@ type RouterSlug = `v${number}.${string}`
 type MiddlewareSlug = `v${number}.${string}`
 type HandlerCallbackWithDeps<T extends any[]> = (args: { envelope: Envelope; deps: T; meta?: any }) => Promise<void> | void
 
-type RouteHandler<T extends any[]> = (args: { envelope: Envelope; deps: T; meta?: any }) => Promise<void> | void
+type RouteHandler<T extends any[]> = (args: { envelope: Envelope; deps: T; meta?: any }) => Promise<any> | void
 type RouteEntry<T extends Constructor<any>[]> = {
   callback: RouteHandler<{ [K in keyof T]: T[K] extends Constructor<infer R> ? R : never }>
   depsConstructors: T
@@ -32,6 +34,8 @@ type ErrorHandler = (args: { error: unknown; envelope: Envelope; meta?: any; rou
 
 type DependencyToken = string | Constructor<any>
 type DependencyFactory = { type: DependencyType; factory: () => any; instance?: any }
+
+type DispatchResult = { success: true; data: any } | { success: false; error: unknown }
 
 export function createRouter() {
   // amazing how you can mimic oop behaviour without any actual oop syntax
@@ -179,118 +183,68 @@ export function createRouter() {
 
   async function _dispatch<T extends Constructor<any>[]>(slug: RouterSlug, envelope: Envelope) {
     const route = routeMap.get(slug) as RouteEntry<T> | undefined
-    if (!route) {
-      throw new Error('Route not found')
-    }
+    if (!route) throw new Error('Route not found')
 
-    // Collect before middlewares
-    const beforeMiddlewareSlugs = routeBeforeMiddlewareMap.get(slug) ?? []
-    const beforeMiddlewares: MiddlewareEntry<any>[] = []
+    // collect middlewares
+    const beforeMiddlewares = (routeBeforeMiddlewareMap.get(slug) ?? []).flatMap((s) => middlewareMap.get(s) ?? [])
+    const afterMiddlewares = (routeAfterMiddlewareMap.get(slug) ?? []).flatMap((s) => middlewareMap.get(s) ?? [])
 
-    for (const slug of beforeMiddlewareSlugs) {
-      const middlewareFunction = middlewareMap.get(slug)
-      if (!middlewareFunction) {
-        throw new Error(`Unregistered middleware being called from route ${route}`)
-      }
-      beforeMiddlewares.push(...middlewareFunction)
-    }
-
-    // Collect after middlewares
-    const afterMiddlewareSlugs = routeAfterMiddlewareMap.get(slug) ?? []
-    const afterMiddlewares: MiddlewareEntry<any>[] = []
-
-    for (const slug of afterMiddlewareSlugs) {
-      const middlewareFunction = middlewareMap.get(slug)
-      if (!middlewareFunction) {
-        throw new Error(`Unregistered middleware being called from route ${route}`)
-      }
-      afterMiddlewares.push(...middlewareFunction)
-    }
-
-    let beforeIndex = -1
-    const runBeforeMiddleware = async (i: number) => {
-      if (i <= beforeIndex) throw new Error('next() called multiple times')
-      beforeIndex = i
-
-      // If no more before middleware → execute route, then run after middleware
-      if (i === beforeMiddlewares.length) {
-        const deps = route.depsConstructors.map(resolveDependency) as {
-          [K in keyof T]: T[K] extends Constructor<infer R> ? R : never
-        }
-
-        // console.log(`DISPATCH : [${slug}] -> ${JSON.stringify(route.meta, null, 2)}`)
-        await route.callback({
+    // Helper to run middleware imperatively
+    const runMiddlewares = async (middlewares: MiddlewareEntry<any>[]) => {
+      for (const mw of middlewares) {
+        const deps = mw.depsConstructors.map(resolveDependency)
+        let calledNext = false
+        await mw.callback({
           envelope,
           deps,
-          meta: route.meta
+          meta: mw.meta,
+          next: async () => {
+            calledNext = true
+          }
         })
-
-        // After route completes, run after middleware chain
-        await runAfterMiddleware(0)
-        return
+        if (!calledNext) break // stop chain if next() not called
       }
-
-      const mw = beforeMiddlewares.at(i)
-      if (!mw) {
-        throw new Error('Middleware before route handling attempted')
-      }
-
-      // const deps = mw.depsConstructors.map(resolveDependency)
-      // lots just doing this to make ts happy
-      const deps = mw.depsConstructors.map(resolveDependency) as {
-        [K in keyof typeof mw.depsConstructors]: (typeof mw.depsConstructors)[K] extends Constructor<infer R> ? R : never
-      }[number][]
-
-      await mw.callback({
-        envelope,
-        deps,
-        meta: mw.meta,
-        next: async () => await runBeforeMiddleware(i + 1)
-      })
     }
 
-    let afterIndex = -1
-    const runAfterMiddleware = async (i: number) => {
-      if (i <= afterIndex) throw new Error('next() called multiple times')
-      afterIndex = i
+    // Run before middlewares
+    await runMiddlewares(beforeMiddlewares)
 
-      if (i === afterMiddlewares.length) {
-        return
-      }
+    // Run route
+    const deps = route.depsConstructors.map(resolveDependency) as any
+    const data = await route.callback({ envelope, deps, meta: route.meta })
 
-      const mw = afterMiddlewares.at(i)
-      if (!mw) {
-        throw new Error('Middleware after route handling attempted')
-      }
+    // Run after middlewares
+    await runMiddlewares(afterMiddlewares)
 
-      // const deps = mw.depsConstructors.map(resolveDependency)
-      // lots just doing this to make ts happy
-      const deps = mw.depsConstructors.map(resolveDependency) as {
-        [K in keyof typeof mw.depsConstructors]: (typeof mw.depsConstructors)[K] extends Constructor<infer R> ? R : never
-      }[number][]
-
-      await mw.callback({
-        envelope,
-        deps,
-        meta: mw.meta,
-        next: async () => await runAfterMiddleware(i + 1)
-      })
-    }
-
-    await runBeforeMiddleware(0)
+    return data
   }
 
-  async function dispatch<T extends Constructor<any>[]>(slug: RouterSlug, envelope: Envelope) {
+  async function dispatch<T extends Constructor<any>[]>(slug: RouterSlug, envelope: Envelope): Promise<DispatchResult> {
     try {
-      await _dispatch<T>(slug, envelope)
+      const data = await _dispatch<T>(slug, envelope)
+      return {
+        success: true,
+        data: data
+      }
     } catch (err) {
       const route = routeMap.get(slug) as RouteEntry<T> | undefined
+
+      envelope.failed = true
+
+      console.error(err)
+      envelope.errors.push(err)
+
       try {
         await runErrorHandlers(err, envelope, route?.meta, slug)
       } catch (handlerErr) {
         // Error handler threw or called next() incorrectly; rethrow the original or handler error
-        console.error(err)
-        throw handlerErr ?? err
+        console.error(handlerErr)
+        envelope.errors.push(handlerErr)
+      }
+
+      return {
+        success: false,
+        error: err
       }
     }
   }
