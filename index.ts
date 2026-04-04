@@ -1,8 +1,11 @@
-import { TelegramClient } from '@mtcute/bun'
+import { InputMedia, TelegramClient } from '@mtcute/bun'
 import { Dispatcher } from '@mtcute/dispatcher'
 import { Subject, timer } from 'rxjs'
 import { filter, map, mergeMap, scan, share, tap, withLatestFrom } from 'rxjs/operators'
+import { downloadMediaObject } from './lib/downloader'
 import { createEnvelope } from './lib/envelope'
+import { hashString } from './lib/helpers'
+import { getPath } from './lib/path'
 import { createRouter, type Envelope } from './lib/router'
 
 // -----------------------------
@@ -55,7 +58,7 @@ const CommandFailed = (env: Envelope, error: unknown): CommandFailed => ({
 // Telegram command to function handlers
 // -----------------------------
 const COMMAND_HANDLERS = {
-  '.dl': 'v1.download_stream_video'
+  '.vdl': 'v1.download_stream_video'
 } as const
 
 // -----------------------------
@@ -90,7 +93,11 @@ class Service {
 }
 
 class AuthService {
-  isAuthenticated(data: any) {
+  isAuthenticated(data: Envelope) {
+    if (data.username !== process.env.ADMIN_USER_NAME) {
+      return false
+    }
+
     return true
   }
 }
@@ -113,21 +120,17 @@ class EventEmitter {
 router.registerSingleton(Logger)
 router.registerSingleton(AuthService)
 router.registerDependency(EventEmitter, 'singleton', () => new EventEmitter(eventBus$))
+router.registerDependency(TelegramClient, 'singleton', () => tg)
 // request scope dep resolution is broken. fix later
-// router.registerDependency(Service, 'request-scoped', () => Service)
 router.registerSingleton(Service)
 
 // -----------------------------
 // Middleware
 // -----------------------------
 router.registerMiddleware('v1.auth', [AuthService], async ({ deps: [auth], envelope, next }) => {
-  if (!auth.isAuthenticated(envelope)) throw new Error('Unauthorized')
-  // envelope['v1.auth.1'] = 'hallo'
-  next()
-})
-
-router.registerMiddleware('v1.auth', [AuthService], async ({ deps: [auth], envelope, next }) => {
-  // envelope['v1.auth.2'] = 'i saw this'
+  if (!auth.isAuthenticated(envelope)) {
+    throw new Error('Unauthorized')
+  }
   next()
 })
 
@@ -145,14 +148,85 @@ router.registerErrorHandler((obj) => {
 // -----------------------------
 router.registerRoute(
   'v1.download_stream_video',
-  [Logger, Service, EventEmitter],
-  async ({ envelope, deps: [logger, service, emitter] }) => {
-    // logger.log('Dispatching test route')
-    // service.doSomething()
-    // console.log(envelope)
-    // throw new Error('fuck you bro')
-    console.log('download stream video')
-    emitter.emitCommand('v1.howdy', envelope)
+  [Logger, Service, EventEmitter, TelegramClient],
+  async ({ envelope, deps: [logger, service, emitter, tg] }) => {
+    if (!envelope.msg) {
+      throw new Error('TG msg expected')
+    }
+
+    const text = envelope.msg.text
+    const replyTo = await envelope.msg.getReplyTo()
+    const replyToText = replyTo?.text ?? ''
+
+    const downloadLink = (() => {
+      const textSeg = text.split(' ')
+      const replyTextSeg = replyToText.split(' ')
+
+      const linkSeg = textSeg.at(1)
+      if (linkSeg) {
+        return {
+          link: linkSeg,
+          msgId: envelope.msg.id,
+          type: 'message'
+        } as const
+      }
+
+      const replyLinkSeg = replyTextSeg.at(0)
+      if (replyLinkSeg) {
+        return {
+          link: replyLinkSeg,
+          msgId: replyTo?.id!,
+          type: 'reply'
+        } as const
+      }
+
+      return null
+    })()
+
+    if (!downloadLink) {
+      tg.sendReaction({
+        'message': envelope.msg.id,
+        chatId: envelope.msg.chat.id,
+        'emoji': '👎'
+      })
+      return
+    }
+
+    const linkHash = hashString(downloadLink.link)
+    const path = getPath().downloads
+    const file = await downloadMediaObject(downloadLink.link, {
+      dir: `${path}/${linkHash}`,
+      filename: linkHash,
+      type: 'video',
+      withExtension: false
+    })
+
+    if (!file) {
+      tg.sendReaction({
+        'message': envelope.msg.id,
+        chatId: envelope.msg.chat.id,
+        'emoji': '👎'
+      })
+      return
+    }
+
+    await tg.sendMedia(
+      envelope.msg.chat.id,
+      InputMedia.video(`file://${file}`, {
+        supportsStreaming: true, // allows inline video playback,
+        caption: 'Here you go'
+      }),
+      {
+        replyTo: downloadLink.msgId
+      }
+    )
+
+    tg.sendReaction({
+      'message': envelope.msg.id,
+      chatId: envelope.msg.chat.id,
+      'emoji': '👍'
+    })
+
     // emitter.emitCommand('v1.download_stream_video', envelope)
   },
   ['v1.auth'],
@@ -257,6 +331,7 @@ dp.onNewMessage((msg) => {
     const env = createEnvelope()
     env.messageText = msg.text
     env.username = msg.sender.username ?? ''
+    env.msg = msg
 
     const cmd = env.messageText.split(' ').at(0)
     const route = COMMAND_HANDLERS[cmd as keyof typeof COMMAND_HANDLERS]

@@ -37,3 +37,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 *.session
 *.session-shm
 *.session-wal
+
+# Downloads
+/downloads/*

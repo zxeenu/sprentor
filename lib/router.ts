@@ -1,7 +1,10 @@
+import type { MessageContext } from '@mtcute/dispatcher'
+
 export type Envelope = {
   [key: string]: any
   username: string
   messageText: string
+  msg?: MessageContext
   correlationId: string
   isCommand: boolean
   isAdmin: boolean
