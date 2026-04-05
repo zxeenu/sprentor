@@ -1,12 +1,12 @@
-import { InputMedia, TelegramClient } from '@mtcute/bun'
+import 'reflect-metadata'
+import { TelegramClient } from '@mtcute/bun'
 import { Dispatcher } from '@mtcute/dispatcher'
 import { Subject, timer } from 'rxjs'
 import { filter, map, mergeMap, scan, share, tap, withLatestFrom } from 'rxjs/operators'
-import { downloadMediaObject } from './lib/downloader'
 import { createEnvelope } from './lib/envelope'
-import { hashString } from './lib/helpers'
-import { getPath } from './lib/path'
+import { registerControllers } from './lib/register_controller'
 import { createRouter, type Envelope } from './lib/router'
+import { DownloadVideoController } from './controllers/download_video_controller'
 
 // -----------------------------
 // Types
@@ -125,6 +125,11 @@ router.registerDependency(TelegramClient, 'singleton', () => tg)
 router.registerSingleton(Service)
 
 // -----------------------------
+// Route Reg
+// -----------------------------
+registerControllers(router, [{ cls: DownloadVideoController, deps: [TelegramClient] }])
+
+// -----------------------------
 // Middleware
 // -----------------------------
 router.registerMiddleware('v1.auth', [AuthService], async ({ deps: [auth], envelope, next }) => {
@@ -141,100 +146,6 @@ router.registerMiddleware('v1.response', [AuthService], async ({ deps: [auth], e
 
 router.registerErrorHandler((obj) => {
   console.log('Something went wrong...', obj)
-})
-
-// -----------------------------
-// Route
-// -----------------------------
-router.registerRoute(
-  'v1.download_stream_video',
-  [Logger, Service, EventEmitter, TelegramClient],
-  async ({ envelope, deps: [logger, service, emitter, tg] }) => {
-    if (!envelope.msg) {
-      throw new Error('TG msg expected')
-    }
-
-    const text = envelope.msg.text
-    const replyTo = await envelope.msg.getReplyTo()
-    const replyToText = replyTo?.text ?? ''
-
-    const downloadLink = (() => {
-      const textSeg = text.split(' ')
-      const replyTextSeg = replyToText.split(' ')
-
-      const linkSeg = textSeg.at(1)
-      if (linkSeg) {
-        return {
-          link: linkSeg,
-          msgId: envelope.msg.id,
-          type: 'message'
-        } as const
-      }
-
-      const replyLinkSeg = replyTextSeg.at(0)
-      if (replyLinkSeg) {
-        return {
-          link: replyLinkSeg,
-          msgId: replyTo?.id!,
-          type: 'reply'
-        } as const
-      }
-
-      return null
-    })()
-
-    if (!downloadLink) {
-      tg.sendReaction({
-        'message': envelope.msg.id,
-        chatId: envelope.msg.chat.id,
-        'emoji': '👎'
-      })
-      return
-    }
-
-    const linkHash = hashString(downloadLink.link)
-    const path = getPath().downloads
-    const file = await downloadMediaObject(downloadLink.link, {
-      dir: `${path}/${linkHash}`,
-      filename: linkHash,
-      type: 'video',
-      withExtension: false
-    })
-
-    if (!file) {
-      tg.sendReaction({
-        'message': envelope.msg.id,
-        chatId: envelope.msg.chat.id,
-        'emoji': '👎'
-      })
-      return
-    }
-
-    await tg.sendMedia(
-      envelope.msg.chat.id,
-      InputMedia.video(`file://${file}`, {
-        supportsStreaming: true, // allows inline video playback,
-        caption: 'Here you go'
-      }),
-      {
-        replyTo: downloadLink.msgId
-      }
-    )
-
-    tg.sendReaction({
-      'message': envelope.msg.id,
-      chatId: envelope.msg.chat.id,
-      'emoji': '👍'
-    })
-
-    // emitter.emitCommand('v1.download_stream_video', envelope)
-  },
-  ['v1.auth'],
-  ['v1.response']
-)
-
-router.registerRoute('v1.howdy', [], async ({ envelope, deps: [] }) => {
-  console.log('from inside v1.howdy')
 })
 
 // -----------------------------

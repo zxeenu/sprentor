@@ -15,7 +15,7 @@ export type Envelope = {
 type Constructor<T> = new (...args: any[]) => T
 type DependencyType = 'singleton' | 'request-scoped'
 type Next = () => Promise<void> | void
-type RouterSlug = `v${number}.${string}`
+export type RouterSlug = `v${number}.${string}`
 type MiddlewareSlug = `v${number}.${string}`
 type HandlerCallbackWithDeps<T extends any[]> = (args: { envelope: Envelope; deps: T; meta?: any }) => Promise<void> | void
 
@@ -48,6 +48,10 @@ export function createRouter() {
   const middlewareMap = new Map<MiddlewareSlug, MiddlewareEntry<any>[]>()
   const dependencyMap = new Map<DependencyToken, DependencyFactory>()
   const errorHandlers: ErrorHandler[] = []
+
+  function resolveAllDependencies() {
+    return [...dependencyMap.keys()].map((token) => resolveDependency(token))
+  }
 
   function registerErrorHandler(handler: ErrorHandler) {
     errorHandlers.push(handler)
@@ -252,5 +256,5 @@ export function createRouter() {
     }
   }
 
-  return { registerRoute, registerMiddleware, registerDependency, dispatch, registerErrorHandler, registerSingleton, resolveDependency }
+  return { resolveAllDependencies, registerRoute, registerMiddleware, registerDependency, dispatch, registerErrorHandler, registerSingleton, resolveDependency }
 }
