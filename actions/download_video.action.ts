@@ -6,11 +6,11 @@ import type { Envelope } from '../lib/router'
 import { readdir } from 'fs/promises'
 import { join } from 'path'
 
-export class DownloadVideoController {
-  public slug = 'v1.download_stream_video'
-  public meta = { description: 'Download and stream video' }
+export class DownloadVideoAction {
+  public readonly slug = 'v1.download_stream_video'
+  public readonly meta = { description: 'Download and stream video' }
 
-  constructor(private tg: TelegramClient) {}
+  constructor(private readonly tg: TelegramClient) {}
 
   async handle(envelope: Envelope) {
     if (!envelope.msg) throw new Error('No msg found')
@@ -36,7 +36,7 @@ export class DownloadVideoController {
     this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👀' })
 
     const linkHash = hashString(downloadLink.link)
-    const path = join(getPath().downloads, linkHash)
+    const path = join(getPath().downloads, 'video', linkHash)
 
     // --- check if folder exists and has any file ---
     let file: string | null = null
@@ -61,7 +61,7 @@ export class DownloadVideoController {
       if (!file) return this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' })
     }
 
-    await this.tg.sendMedia(envelope.msg.chat.id, InputMedia.video(`file://${file}`, { supportsStreaming: true, caption: 'Here you go', supportsStreaming: true }), { replyTo: downloadLink.msgId })
+    await this.tg.sendMedia(envelope.msg.chat.id, InputMedia.video(`file://${file}`, { supportsStreaming: true, caption: 'Here you go' }), { replyTo: downloadLink.msgId })
 
     this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👍' })
     return null

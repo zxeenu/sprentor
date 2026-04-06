@@ -6,7 +6,9 @@ import { filter, map, mergeMap, scan, share, tap, withLatestFrom } from 'rxjs/op
 import { createEnvelope } from './lib/envelope'
 import { registerControllers } from './lib/register_controller'
 import { createRouter, type Envelope } from './lib/router'
-import { DownloadVideoController } from './controllers/download_video_controller'
+import { CatAlbumGetAction } from './actions/cat_album_get.action'
+import { CatAlbumStoreAction } from './actions/cat_album_store.action'
+import { DownloadVideoAction } from './actions/download_video.action'
 
 // -----------------------------
 // Types
@@ -58,7 +60,9 @@ const CommandFailed = (env: Envelope, error: unknown): CommandFailed => ({
 // Telegram command to function handlers
 // -----------------------------
 const COMMAND_HANDLERS = {
-  '.vdl': 'v1.download_stream_video'
+  '.dlv': 'v1.download_stream_video',
+  '.cat': 'v1.cat_bucket_dump',
+  '.cat-link': 'v1.cat_bucket_get_link'
 } as const
 
 // -----------------------------
@@ -127,7 +131,11 @@ router.registerSingleton(Service)
 // -----------------------------
 // Route Reg
 // -----------------------------
-registerControllers(router, [{ cls: DownloadVideoController, deps: [TelegramClient] }])
+registerControllers(router, [
+  { cls: CatAlbumGetAction, deps: [TelegramClient] },
+  { cls: CatAlbumStoreAction, deps: [TelegramClient] },
+  { cls: DownloadVideoAction, deps: [TelegramClient] }
+])
 
 // -----------------------------
 // Middleware
