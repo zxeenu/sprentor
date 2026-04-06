@@ -5,8 +5,9 @@ import { getPath } from '../lib/path'
 import type { Envelope } from '../lib/router'
 import { readdir } from 'fs/promises'
 import { join } from 'path'
+import type { TelegramAction } from '../lib/types'
 
-export class DownloadVideoAction {
+export class DownloadVideoAction implements TelegramAction {
   public readonly slug = 'v1.download_stream_video'
   public readonly meta = { description: 'Download and stream video' }
 
@@ -30,7 +31,8 @@ export class DownloadVideoAction {
     })()
 
     if (!downloadLink) {
-      return this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' })
+      this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' })
+      return
     }
 
     this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👀' })
@@ -58,12 +60,14 @@ export class DownloadVideoAction {
         type: 'video',
         withExtension: false
       })
-      if (!file) return this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' })
+      if (!file) {
+        this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' })
+        return
+      }
     }
 
     await this.tg.sendMedia(envelope.msg.chat.id, InputMedia.video(`file://${file}`, { supportsStreaming: true, caption: 'Here you go' }), { replyTo: downloadLink.msgId })
-
     this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👍' })
-    return null
+    return
   }
 }

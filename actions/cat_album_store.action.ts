@@ -3,8 +3,9 @@ import { mkdir } from 'fs/promises'
 import { join } from 'path'
 import { getPath } from '../lib/path'
 import type { Envelope } from '../lib/router'
+import type { TelegramAction } from '../lib/types'
 
-export class CatAlbumStoreAction {
+export class CatAlbumStoreAction implements TelegramAction {
   public readonly slug = 'v1.cat_bucket_dump'
   public readonly meta = { description: 'Upload an image to a bucket of cats. Hahahaha' }
 
@@ -17,8 +18,10 @@ export class CatAlbumStoreAction {
     const media = replyTo?.media
 
     if (!media) {
-      return null
+      return
     }
+
+    this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👀' })
 
     if (media.type === 'photo') {
       const dir = join(getPath().downloads, 'photo')
@@ -42,6 +45,6 @@ export class CatAlbumStoreAction {
     }
 
     this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👍' })
-    return null
+    return
   }
 }
