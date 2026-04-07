@@ -6,10 +6,14 @@ import type { Envelope } from '../lib/router'
 import type { TelegramAction } from '../lib/types'
 
 export class CatAlbumStoreAction implements TelegramAction {
-  public readonly slug = 'v1.cat_bucket_dump'
-  public readonly meta = { description: 'Upload an image to a bucket of cats. Hahahaha' }
+  public static readonly slug = 'v1.cat_bucket_dump'
+  public static readonly meta = { description: 'Upload an image to a bucket of cats. Hahahaha' }
 
   constructor(private readonly tg: TelegramClient) {}
+
+  authorize(envelope: Envelope) {
+    return true
+  }
 
   async handle(envelope: Envelope) {
     if (!envelope.msg) throw new Error('No msg found')
