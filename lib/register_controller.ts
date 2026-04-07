@@ -1,4 +1,5 @@
 import type { Envelope, createRouter } from './router'
+import type { TelegramAction } from './types'
 
 type Constructor<T> = new (...args: any[]) => T
 
@@ -12,7 +13,7 @@ export function registerControllers(router: ReturnType<typeof createRouter>, con
   for (const { cls: ControllerClass, deps: depTokens } of controllers) {
     // Resolve only the dependencies this controller declares
     const resolvedDeps = depTokens.map((token) => router.resolveDependency(token))
-    const instance = new ControllerClass(...resolvedDeps)
+    const instance: TelegramAction = new ControllerClass(...resolvedDeps)
 
     // Ensure the controller has slug & handle
     if (!('slug' in instance) || typeof instance.handle !== 'function') {
@@ -22,7 +23,17 @@ export function registerControllers(router: ReturnType<typeof createRouter>, con
     router.registerRoute(
       instance.slug,
       [], // dependencies are already injected via constructor
-      async ({ envelope }: { envelope: Envelope }) => instance.handle(envelope),
+      async ({ envelope }: { envelope: Envelope }) => {
+        const isAuthorized = instance.authorize(envelope)
+
+        if (!isAuthorized) {
+          envelope.isAuthorized = false
+          return
+        }
+
+        envelope.isAuthorized = true
+        instance.handle(envelope)
+      },
       [], // before middleware
       [], // after middleware
       instance.meta

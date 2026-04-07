@@ -141,9 +141,14 @@ registerControllers(router, [
 // Middleware
 // -----------------------------
 router.registerMiddleware('v1.auth', [AuthService], async ({ deps: [auth], envelope, next }) => {
-  if (!auth.isAuthenticated(envelope)) {
+  // if (!auth.isAuthenticated(envelope)) {
+  //   throw new Error('Unauthorized')
+  // }
+
+  if (!envelope.isAuthorized) {
     throw new Error('Unauthorized')
   }
+
   next()
 })
 

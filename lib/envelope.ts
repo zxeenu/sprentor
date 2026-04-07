@@ -10,6 +10,7 @@ export function createEnvelope(data?: { [key: string]: any }): Envelope {
     username: '',
     messageText: '',
     failed: false,
+    isAuthorized: false,
     errors: []
   }
 }

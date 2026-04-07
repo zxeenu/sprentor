@@ -5,6 +5,7 @@ export type Envelope = {
   username: string
   messageText: string
   msg?: MessageContext
+  isAuthorized: boolean
   correlationId: string
   isCommand: boolean
   isAdmin: boolean

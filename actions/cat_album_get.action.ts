@@ -8,6 +8,10 @@ export class CatAlbumGetAction implements TelegramAction {
 
   constructor(private readonly tg: TelegramClient) {}
 
+  authorize(envelope: Envelope) {
+    return true
+  }
+
   async handle(envelope: Envelope) {
     if (!envelope.msg) throw new Error('No msg found')
     this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👍' })

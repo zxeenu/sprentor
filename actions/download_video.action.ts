@@ -13,6 +13,10 @@ export class DownloadVideoAction implements TelegramAction {
 
   constructor(private readonly tg: TelegramClient) {}
 
+  authorize(envelope: Envelope) {
+    return true
+  }
+
   async handle(envelope: Envelope) {
     if (!envelope.msg) throw new Error('No msg found')
 
