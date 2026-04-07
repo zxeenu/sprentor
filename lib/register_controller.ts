@@ -24,7 +24,7 @@ export function registerControllers(router: ReturnType<typeof createRouter>, con
       instance.slug,
       [], // dependencies are already injected via constructor
       async ({ envelope }: { envelope: Envelope }) => {
-        const isAuthorized = instance.authorize(envelope)
+        const isAuthorized = await instance.authorize(envelope)
 
         if (!isAuthorized) {
           envelope.isAuthorized = false
@@ -32,7 +32,7 @@ export function registerControllers(router: ReturnType<typeof createRouter>, con
         }
 
         envelope.isAuthorized = true
-        instance.handle(envelope)
+        await instance.handle(envelope)
       },
       [], // before middleware
       [], // after middleware
