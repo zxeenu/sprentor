@@ -3,8 +3,8 @@ import type { Envelope } from '../lib/router'
 import type { TelegramAction } from '../lib/types'
 
 export class CatAlbumGetAction implements TelegramAction {
-  public readonly slug = 'v1.cat_bucket_get_link'
-  public readonly meta = { description: 'Get link to cat album' }
+  public static readonly slug = 'v1.cat_bucket_get_link'
+  public static readonly meta = { description: 'Get link to cat album' }
 
   constructor(private readonly tg: TelegramClient) {}
 

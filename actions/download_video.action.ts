@@ -8,8 +8,8 @@ import { join } from 'path'
 import type { TelegramAction } from '../lib/types'
 
 export class DownloadVideoAction implements TelegramAction {
-  public readonly slug = 'v1.download_stream_video'
-  public readonly meta = { description: 'Download and stream video' }
+  public static readonly slug = 'v1.download_stream_video'
+  public static readonly meta = { description: 'Download and stream video' }
 
   constructor(private readonly tg: TelegramClient) {}
 
