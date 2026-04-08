@@ -1,10 +1,10 @@
 import { type TelegramClient } from '@mtcute/bun'
 import { mkdir } from 'fs/promises'
 import { join } from 'path'
+import type { AuthService } from '..'
 import { getPath } from '../lib/path'
 import type { Envelope } from '../lib/router'
 import type { TelegramAction } from '../lib/types'
-import type { AuthService } from '..'
 
 export class ImgBBStoreAction implements TelegramAction {
   public static readonly slug = 'v1.img_bb_store'
