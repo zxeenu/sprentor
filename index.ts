@@ -1,14 +1,14 @@
-import 'reflect-metadata'
 import { TelegramClient } from '@mtcute/bun'
 import { Dispatcher } from '@mtcute/dispatcher'
+import 'reflect-metadata'
 import { Subject, timer } from 'rxjs'
 import { filter, map, mergeMap, scan, share, tap, withLatestFrom } from 'rxjs/operators'
+import { DownloadVideoAction } from './actions/download_video.action'
+import { ImageBBGetAction } from './actions/img_bb_get.action'
+import { ImgBBStoreAction } from './actions/img_bb_store.action'
 import { createEnvelope } from './lib/envelope'
 import { registerControllers } from './lib/register_controller'
 import { createRouter, type Envelope } from './lib/router'
-import { CatAlbumGetAction } from './actions/cat_album_get.action'
-import { CatAlbumStoreAction } from './actions/cat_album_store.action'
-import { DownloadVideoAction } from './actions/download_video.action'
 
 // -----------------------------
 // Types
@@ -57,29 +57,6 @@ const CommandFailed = (env: Envelope, error: unknown): CommandFailed => ({
 })
 
 // -----------------------------
-// Telegram command to function handlers
-// -----------------------------
-const COMMAND_HANDLERS = {
-  '.dlv': 'v1.download_stream_video',
-  '.cat': 'v1.cat_bucket_dump',
-  '.cat-link': 'v1.cat_bucket_get_link'
-} as const
-
-// -----------------------------
-// Telegram client
-// -----------------------------
-const tg = new TelegramClient({
-  apiId: process.env.TELEGRAM_API_ID! as any,
-  apiHash: process.env.TELEGRAM_API_HASH! as any
-})
-const dp = Dispatcher.for(tg)
-
-// -----------------------------
-// Sources
-// -----------------------------
-const eventBus$ = new Subject<DomainEvent>()
-
-// -----------------------------
 // Biz logic setup
 // -----------------------------
 const router = createRouter()
@@ -96,9 +73,9 @@ class Service {
   }
 }
 
-class AuthService {
-  isAuthenticated(data: Envelope) {
-    if (data.username !== process.env.ADMIN_USER_NAME) {
+export class AuthService {
+  async isAuthenticated(data: Envelope) {
+    if (data.username === process.env.ADMIN_USER_NAME) {
       return false
     }
 
@@ -118,6 +95,37 @@ class EventEmitter {
   }
 }
 
+const REGISTERED_ACTIONS = [
+  { cls: ImgBBStoreAction, deps: [TelegramClient, AuthService] },
+  { cls: ImageBBGetAction, deps: [TelegramClient, AuthService] },
+  { cls: DownloadVideoAction, deps: [TelegramClient, AuthService] }
+]
+
+// -----------------------------
+// Telegram command to function handlers
+// -----------------------------
+const COMMAND_HANDLERS = REGISTERED_ACTIONS.reduce((current, object) => {
+  return {
+    ...current,
+    [object.cls.command]: object.cls.slug
+  }
+}, {})
+console.log(COMMAND_HANDLERS)
+
+// -----------------------------
+// Telegram client
+// -----------------------------
+const tg = new TelegramClient({
+  apiId: process.env.TELEGRAM_API_ID! as any,
+  apiHash: process.env.TELEGRAM_API_HASH! as any
+})
+const dp = Dispatcher.for(tg)
+
+// -----------------------------
+// Sources
+// -----------------------------
+const eventBus$ = new Subject<DomainEvent>()
+
 // -----------------------------
 // Register dependencies
 // -----------------------------
@@ -131,11 +139,7 @@ router.registerSingleton(Service)
 // -----------------------------
 // Route Reg
 // -----------------------------
-registerControllers(router, [
-  { cls: CatAlbumGetAction, deps: [TelegramClient] },
-  { cls: CatAlbumStoreAction, deps: [TelegramClient] },
-  { cls: DownloadVideoAction, deps: [TelegramClient] }
-])
+registerControllers(router, REGISTERED_ACTIONS)
 
 // -----------------------------
 // Middleware

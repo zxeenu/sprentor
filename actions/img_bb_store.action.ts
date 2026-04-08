@@ -4,15 +4,20 @@ import { join } from 'path'
 import { getPath } from '../lib/path'
 import type { Envelope } from '../lib/router'
 import type { TelegramAction } from '../lib/types'
+import type { AuthService } from '..'
 
-export class CatAlbumStoreAction implements TelegramAction {
-  public static readonly slug = 'v1.cat_bucket_dump'
-  public static readonly meta = { description: 'Upload an image to a bucket of cats. Hahahaha' }
+export class ImgBBStoreAction implements TelegramAction {
+  public static readonly slug = 'v1.img_bb_store'
+  public static readonly command = '.imgbb'
+  public static readonly meta = { description: 'Upload an imgbb. Hahahaha' }
 
-  constructor(private readonly tg: TelegramClient) {}
+  constructor(
+    private readonly tg: TelegramClient,
+    private readonly auth: AuthService
+  ) {}
 
-  authorize(envelope: Envelope) {
-    return true
+  async authorize(envelope: Envelope) {
+    return await this.auth.isAuthenticated(envelope)
   }
 
   async handle(envelope: Envelope) {
