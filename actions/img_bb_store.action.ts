@@ -1,15 +1,24 @@
 import { type TelegramClient } from '@mtcute/bun'
 import { mkdir } from 'fs/promises'
 import { join } from 'path'
+import type { AuthService } from '..'
 import { getPath } from '../lib/path'
 import type { Envelope } from '../lib/router'
 import type { TelegramAction } from '../lib/types'
 
-export class CatAlbumStoreAction implements TelegramAction {
-  public readonly slug = 'v1.cat_bucket_dump'
-  public readonly meta = { description: 'Upload an image to a bucket of cats. Hahahaha' }
+export class ImgBBStoreAction implements TelegramAction {
+  public static readonly slug = 'v1.img_bb_store'
+  public static readonly command = '.imgbb'
+  public static readonly meta = { description: 'Upload an imgbb. Hahahaha' }
 
-  constructor(private readonly tg: TelegramClient) {}
+  constructor(
+    private readonly tg: TelegramClient,
+    private readonly auth: AuthService
+  ) {}
+
+  async authorize(envelope: Envelope) {
+    return await this.auth.isAuthenticated(envelope)
+  }
 
   async handle(envelope: Envelope) {
     if (!envelope.msg) throw new Error('No msg found')

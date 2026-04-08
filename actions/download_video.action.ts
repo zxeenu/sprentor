@@ -6,15 +6,20 @@ import type { Envelope } from '../lib/router'
 import { readdir } from 'fs/promises'
 import { join } from 'path'
 import type { TelegramAction } from '../lib/types'
+import type { AuthService } from '..'
 
 export class DownloadVideoAction implements TelegramAction {
-  public readonly slug = 'v1.download_stream_video'
-  public readonly meta = { description: 'Download and stream video' }
+  public static readonly slug = 'v1.download_stream_video'
+  public static readonly command = '.dlv'
+  public static readonly meta = { description: 'Download and stream video' }
 
-  constructor(private readonly tg: TelegramClient) {}
+  constructor(
+    private readonly tg: TelegramClient,
+    private readonly auth: AuthService
+  ) {}
 
-  authorize(envelope: Envelope) {
-    return true
+  async authorize(envelope: Envelope) {
+    return await this.auth.isAuthenticated(envelope)
   }
 
   async handle(envelope: Envelope) {
@@ -70,6 +75,7 @@ export class DownloadVideoAction implements TelegramAction {
       }
     }
 
+    console.log(file)
     await this.tg.sendMedia(envelope.msg.chat.id, InputMedia.video(`file://${file}`, { supportsStreaming: true, caption: 'Here you go' }), { replyTo: downloadLink.msgId })
     this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👍' })
     return

@@ -1,8 +1,11 @@
 import type { Envelope } from './router'
 
-export interface TelegramAction {
-  slug: `v${number}.${string}`
-  meta: Record<string, any>
-  handle(envelope: Envelope): Promise<void> | void
-  authorize(envelope: Envelope): Promise<boolean> | boolean
+type SlugString = `v${number}.${string}`
+
+export abstract class TelegramAction {
+  public static readonly slug: SlugString
+  public static readonly command: string
+  public static readonly meta: Record<string, any>
+  public abstract handle(envelope: Envelope): Promise<void> | void
+  public authorize?(envelope: Envelope): Promise<boolean> | boolean
 }
