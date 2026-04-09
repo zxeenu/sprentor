@@ -9,37 +9,9 @@ import { ImgBBStoreAction } from './actions/img_bb_store.action'
 import { createEnvelope } from './lib/envelope'
 import { registerControllers } from './lib/register_controller'
 import { createRouter, type Envelope } from './lib/router'
-
-// -----------------------------
-// Types
-// -----------------------------
-type TelegramMessageReceived = {
-  type: 'telegram.message.received'
-  payload: Envelope
-}
-
-type CommandDispatch = {
-  type: 'command.dispatch'
-  payload: {
-    route: `v${number}.${string}`
-    env: Envelope
-  }
-}
-
-type CommandSucceeded = {
-  type: 'command.succeeded'
-  payload: Envelope
-}
-
-type CommandFailed = {
-  type: 'command.failed'
-  payload: {
-    env: Envelope
-    error: unknown
-  }
-}
-
-type DomainEvent = TelegramMessageReceived | CommandDispatch | CommandSucceeded | CommandFailed
+import type { SlugString } from './lib/types'
+import { AuthService } from './services/auth.service'
+import { EventEmitter, type CommandDispatch, type CommandFailed, type CommandSucceeded, type DomainEvent, type TelegramMessageReceived } from './services/event_emitter.service'
 
 const TelegramMessageReceived = (env: Envelope): TelegramMessageReceived => ({
   type: 'telegram.message.received',
@@ -61,40 +33,6 @@ const CommandFailed = (env: Envelope, error: unknown): CommandFailed => ({
 // -----------------------------
 const router = createRouter()
 
-class Logger {
-  log(msg: string) {
-    console.log('Log:', msg)
-  }
-}
-
-class Service {
-  doSomething() {
-    console.log('Service action')
-  }
-}
-
-export class AuthService {
-  async isAuthenticated(data: Envelope) {
-    if (data.username !== process.env.ADMIN_USER_NAME) {
-      return false
-    }
-
-    return true
-  }
-}
-
-class EventEmitter {
-  constructor(private eventBus$: Subject<DomainEvent>) {}
-
-  emit(event: DomainEvent) {
-    this.eventBus$.next(event)
-  }
-
-  emitCommand(route: `v${number}.${string}`, env: Envelope) {
-    this.emit({ type: 'command.dispatch', payload: { route, env } })
-  }
-}
-
 const REGISTERED_ACTIONS = [
   { cls: ImgBBStoreAction, deps: [TelegramClient, AuthService] },
   { cls: ImageBBGetAction, deps: [TelegramClient, AuthService] },
@@ -104,10 +42,19 @@ const REGISTERED_ACTIONS = [
 // -----------------------------
 // Telegram command to function handlers
 // -----------------------------
-const COMMAND_HANDLERS = REGISTERED_ACTIONS.reduce((current, object) => {
+const COMMAND_HANDLERS: Record<string, SlugString> = REGISTERED_ACTIONS.reduce((current, object) => {
+  const keys = object.cls.command
+
+  const handlerTempObj = keys.reduce((_current, _object) => {
+    return {
+      ..._current,
+      [_object]: object.cls.slug
+    }
+  }, {})
+
   return {
     ...current,
-    [object.cls.command]: object.cls.slug
+    ...handlerTempObj
   }
 }, {})
 console.log(COMMAND_HANDLERS)
@@ -129,12 +76,10 @@ const eventBus$ = new Subject<DomainEvent>()
 // -----------------------------
 // Register dependencies
 // -----------------------------
-router.registerSingleton(Logger)
 router.registerSingleton(AuthService)
 router.registerDependency(EventEmitter, 'singleton', () => new EventEmitter(eventBus$))
 router.registerDependency(TelegramClient, 'singleton', () => tg)
 // request scope dep resolution is broken. fix later
-router.registerSingleton(Service)
 
 // -----------------------------
 // Route Reg

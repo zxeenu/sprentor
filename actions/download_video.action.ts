@@ -6,11 +6,11 @@ import type { Envelope } from '../lib/router'
 import { readdir } from 'fs/promises'
 import { join } from 'path'
 import type { TelegramAction } from '../lib/types'
-import type { AuthService } from '..'
+import type { AuthService } from '../services/auth.service'
 
 export class DownloadVideoAction implements TelegramAction {
   public static readonly slug = 'v1.download_stream_video'
-  public static readonly command = '.dlv'
+  public static readonly command = ['.dlv', '.dl']
   public static readonly meta = { description: 'Download and stream video' }
 
   constructor(

@@ -1,11 +1,11 @@
 import { type TelegramClient } from '@mtcute/bun'
 import type { Envelope } from '../lib/router'
 import type { TelegramAction } from '../lib/types'
-import type { AuthService } from '..'
+import type { AuthService } from '../services/auth.service'
 
 export class ImageBBGetAction implements TelegramAction {
   public static readonly slug = 'v1.imgbb_get_link'
-  public static readonly command = '.imgbb-link'
+  public static readonly command = ['.imgbb-link']
   public static readonly meta = { description: 'Get link imgbb dump' }
 
   constructor(
