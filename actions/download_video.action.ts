@@ -26,7 +26,7 @@ export class DownloadVideoAction implements TelegramAction {
 
     const payload = getTelegramMsgPolicyData(envelope.msg)
     if (payload) {
-      const isAllowed = await this.prisma.chatAccessGrant.count({
+      const grant = await this.prisma.chatAccessGrant.findFirst({
         where: {
           chat_id: String(payload.chatId),
           user_name: payload.userName,
@@ -34,7 +34,7 @@ export class DownloadVideoAction implements TelegramAction {
         }
       })
 
-      if (isAllowed > 0) {
+      if (grant) {
         return true
       }
     }
