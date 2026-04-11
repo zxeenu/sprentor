@@ -17,6 +17,7 @@ import { GrantAction } from './actions/grant.action'
 import { RevokeAction } from './actions/revoke.action'
 import { PrismaClient } from './lib/generated/prisma/client'
 import { PrismaLibSql } from '@prisma/adapter-libsql'
+import { GrantToGroupAction } from './actions/grant_to_group.action'
 
 const adapter = new PrismaLibSql({
   url: process.env.DATABASE_URL ?? ''
@@ -48,6 +49,7 @@ const REGISTERED_ACTIONS = [
   { cls: ImageBBGetAction, deps: [TelegramClient, AuthService, PrismaClient] },
   { cls: DownloadVideoAction, deps: [TelegramClient, AuthService, PrismaClient] },
   { cls: GrantAction, deps: [ConfigService, AuthService, PrismaClient, TelegramClient] },
+  { cls: GrantToGroupAction, deps: [ConfigService, AuthService, PrismaClient, TelegramClient] },
   { cls: RevokeAction, deps: [ConfigService, AuthService, PrismaClient, TelegramClient] }
 ]
 

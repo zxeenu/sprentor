@@ -5,10 +5,10 @@ import type { TelegramAction } from '../lib/types'
 import type { AuthService } from '../services/auth.service'
 import type { ConfigService } from '../services/config.service'
 
-export class GrantAction implements TelegramAction {
-  public static readonly slug = 'v1.grant_access'
-  public static readonly command = ['.grant']
-  public static readonly meta = { description: 'grant access' }
+export class GrantToGroupAction implements TelegramAction {
+  public static readonly slug = 'v1.grant_to_group_access'
+  public static readonly command = ['.grant_to_group']
+  public static readonly meta = { description: 'grant access to a group' }
 
   constructor(
     private readonly config: ConfigService,
@@ -26,9 +26,7 @@ export class GrantAction implements TelegramAction {
 
     // console.log(envelope.msg)
     const chatId = envelope.msg.chat.id
-    const replyTo = await envelope.msg.getReplyTo()
-    const userName = replyTo?.sender.username
-    const userId = replyTo?.sender.id
+    const chatMembers = await this.tg.getChatMembers(chatId)
 
     const senderId = envelope.msg.sender.id
 
@@ -39,44 +37,48 @@ export class GrantAction implements TelegramAction {
       return
     }
 
-    if (!userId) {
-      this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' })
-      return
-    }
-
-    if (!userName) {
-      this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' })
-      return
-    }
-
     const actionSlug = this.config.commandHandlers?.[actionCommandSlug]
     if (!actionSlug) {
       this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' })
       return
     }
 
-    const existingGrant = await this.prisma.chatAccessGrant.findFirst({
-      where: {
-        action_slug: actionSlug,
-        granted_chat_id: String(chatId),
-        granted_user_name: userName,
-        granted_user_id: String(userId),
-        deleted_at: null
+    for (const chatMember of chatMembers) {
+      if (chatMember.user.isSelf) {
+        continue
       }
-    })
 
-    if (!existingGrant) {
-      await this.prisma.chatAccessGrant.create({
-        data: {
+      if (chatMember.user.isBot) {
+        continue
+      }
+
+      const userId = chatMember.user.id
+      const userName = chatMember.user.username
+
+      const existingGrant = await this.prisma.chatAccessGrant.findFirst({
+        where: {
           action_slug: actionSlug,
           granted_chat_id: String(chatId),
           granted_user_name: userName,
           granted_user_id: String(userId),
-          action_by_user_id: String(senderId),
-          action_at: new Date()
+          deleted_at: null
         }
       })
+
+      if (!existingGrant) {
+        await this.prisma.chatAccessGrant.create({
+          data: {
+            action_slug: actionSlug,
+            granted_chat_id: String(chatId),
+            granted_user_name: userName,
+            granted_user_id: String(userId),
+            action_by_user_id: String(senderId),
+            action_at: new Date()
+          }
+        })
+      }
     }
+
     this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👍' })
     return
   }

@@ -14,6 +14,7 @@ export function hashString(input: string) {
 export function getTelegramMsgPolicyData(msg: Message) {
   const chatId = msg.chat.id
   const userName = msg.sender.username
+  const userId = msg.sender.id
 
   if (!userName) {
     return null
@@ -21,6 +22,7 @@ export function getTelegramMsgPolicyData(msg: Message) {
 
   return {
     userName,
-    chatId
+    chatId,
+    userId
   }
 }

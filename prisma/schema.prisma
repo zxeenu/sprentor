@@ -13,9 +13,15 @@ datasource db {
 }
 
 model ChatAccessGrant {
-  id          Int       @id @default(autoincrement())
-  user_name   String
-  chat_id     String
-  action_slug String
-  deleted_at  DateTime?
+  id                 Int       @id @default(autoincrement())
+  granted_user_name  String?
+  granted_user_id    String?
+  granted_chat_id    String
+  granted_at         DateTime  @default(now())
+  action_slug        String
+  action_by_user_id  String
+  action_at          DateTime
+  deleted_at         DateTime?
+  deleted_by_user_id DateTime?
+  updated_at         DateTime  @updatedAt
 }

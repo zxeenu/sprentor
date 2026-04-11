@@ -28,10 +28,18 @@ export class RevokeAction implements TelegramAction {
     const chatId = envelope.msg.chat.id
     const replyTo = await envelope.msg.getReplyTo()
     const userName = replyTo?.sender.username
+    const userId = replyTo?.sender.id
+
+    const senderId = envelope.msg.sender.id
 
     const actionCommandSeg = envelope.msg.text.split(' ')
     const actionCommandSlug = actionCommandSeg.at(1)
     if (!actionCommandSlug) {
+      this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' })
+      return
+    }
+
+    if (!userId) {
       this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' })
       return
     }
@@ -47,25 +55,19 @@ export class RevokeAction implements TelegramAction {
       return
     }
 
-    const existingGrant = await this.prisma.chatAccessGrant.findFirst({
+    await this.prisma.chatAccessGrant.updateMany({
       where: {
         action_slug: actionSlug,
-        chat_id: String(chatId),
-        user_name: userName,
+        granted_user_id: String(userId),
+        granted_chat_id: String(chatId),
         deleted_at: null
+      },
+      data: {
+        deleted_at: new Date(),
+        deleted_by_user_id: String(senderId)
       }
     })
 
-    if (!existingGrant) {
-      await this.prisma.chatAccessGrant.create({
-        data: {
-          action_slug: actionSlug,
-          chat_id: String(chatId),
-          user_name: userName,
-          deleted_at: new Date()
-        }
-      })
-    }
     this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👍' })
     return
   }

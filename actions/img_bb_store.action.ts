@@ -26,9 +26,10 @@ export class ImgBBStoreAction implements TelegramAction {
     if (payload) {
       const grant = await this.prisma.chatAccessGrant.findFirst({
         where: {
-          chat_id: String(payload.chatId),
-          user_name: payload.userName,
-          action_slug: ImgBBStoreAction.slug
+          granted_chat_id: String(payload.chatId),
+          granted_user_id: String(payload.userId),
+          action_slug: ImgBBStoreAction.slug,
+          deleted_at: null
         }
       })
 
