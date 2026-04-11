@@ -1,3 +1,4 @@
+import type { Message } from '@mtcute/bun'
 import { createHash } from 'crypto'
 
 export function extractVideoID(url: string) {
@@ -8,4 +9,18 @@ export function extractVideoID(url: string) {
 
 export function hashString(input: string) {
   return createHash('sha256').update(input).digest('hex')
+}
+
+export function getTelegramMsgPolicyData(msg: Message) {
+  const chatId = msg.chat.id
+  const userName = msg.sender.username
+
+  if (!userName) {
+    return null
+  }
+
+  return {
+    userName,
+    chatId
+  }
 }

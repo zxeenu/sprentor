@@ -5,6 +5,8 @@ import { getPath } from '../lib/path'
 import type { Envelope } from '../lib/router'
 import type { TelegramAction } from '../lib/types'
 import type { AuthService } from '../services/auth.service'
+import type { PrismaClient } from '../lib/generated/prisma/client'
+import { getTelegramMsgPolicyData } from '../lib/helpers'
 
 export class ImgBBStoreAction implements TelegramAction {
   public static readonly slug = 'v1.img_bb_store'
@@ -13,10 +15,28 @@ export class ImgBBStoreAction implements TelegramAction {
 
   constructor(
     private readonly tg: TelegramClient,
-    private readonly auth: AuthService
+    private readonly auth: AuthService,
+    private readonly prisma: PrismaClient
   ) {}
 
   async authorize(envelope: Envelope) {
+    if (!envelope.msg) throw new Error('No msg found')
+
+    const payload = getTelegramMsgPolicyData(envelope.msg)
+    if (payload) {
+      const isAllowed = await this.prisma.chatAccessGrant.count({
+        where: {
+          chat_id: String(payload.chatId),
+          user_name: payload.userName,
+          action_slug: ImgBBStoreAction.slug
+        }
+      })
+
+      if (isAllowed > 0) {
+        return true
+      }
+    }
+
     return await this.auth.isAuthenticated(envelope)
   }
 

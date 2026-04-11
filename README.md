@@ -36,3 +36,10 @@ To run a single test forever:
 ```bash
 bun test --watch downloader.test.ts
 ```
+
+Prisma
+
+```bash
+bunx --bun prisma migrate dev --name init
+bunx --bun prisma generate
+```

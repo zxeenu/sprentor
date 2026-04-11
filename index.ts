@@ -1,6 +1,5 @@
 import { TelegramClient } from '@mtcute/bun'
 import { Dispatcher } from '@mtcute/dispatcher'
-import 'reflect-metadata'
 import { Subject, timer } from 'rxjs'
 import { filter, map, mergeMap, scan, share, tap, withLatestFrom } from 'rxjs/operators'
 import { DownloadVideoAction } from './actions/download_video.action'
@@ -16,6 +15,13 @@ import { ConfigService } from './services/config.service'
 import { EventEmitter, type CommandDispatch, type CommandFailed, type CommandSucceeded, type DomainEvent, type TelegramMessageReceived } from './services/event_emitter.service'
 import { GrantAction } from './actions/grant.action'
 import { RevokeAction } from './actions/revoke.action'
+import { PrismaClient } from './lib/generated/prisma/client'
+import { PrismaLibSql } from '@prisma/adapter-libsql'
+
+const adapter = new PrismaLibSql({
+  url: process.env.DATABASE_URL ?? ''
+})
+const prisma = new PrismaClient({ adapter })
 
 const TelegramMessageReceived = (env: Envelope): TelegramMessageReceived => ({
   type: 'telegram.message.received',
@@ -38,11 +44,11 @@ const CommandFailed = (env: Envelope, error: unknown): CommandFailed => ({
 const router = createRouter()
 
 const REGISTERED_ACTIONS = [
-  { cls: ImgBBStoreAction, deps: [TelegramClient, AuthService] },
-  { cls: ImageBBGetAction, deps: [TelegramClient, AuthService] },
-  { cls: DownloadVideoAction, deps: [TelegramClient, AuthService] },
-  { cls: GrantAction, deps: [ConfigService, AuthService] },
-  { cls: RevokeAction, deps: [ConfigService, AuthService] }
+  { cls: ImgBBStoreAction, deps: [TelegramClient, AuthService, PrismaClient] },
+  { cls: ImageBBGetAction, deps: [TelegramClient, AuthService, PrismaClient] },
+  { cls: DownloadVideoAction, deps: [TelegramClient, AuthService, PrismaClient] },
+  { cls: GrantAction, deps: [ConfigService, AuthService, PrismaClient, TelegramClient] },
+  { cls: RevokeAction, deps: [ConfigService, AuthService, PrismaClient, TelegramClient] }
 ]
 
 // -----------------------------
@@ -90,6 +96,7 @@ router.registerSingleton(AuthService)
 router.registerDependency(EventEmitter, 'singleton', () => new EventEmitter(eventBus$))
 router.registerDependency(TelegramClient, 'singleton', () => tg)
 router.registerDependency(ConfigService, 'singleton', () => config)
+router.registerDependency(PrismaClient, 'singleton', () => prisma)
 
 // request scope dep resolution is broken. fix later
 
