@@ -7,6 +7,7 @@ import { readdir } from 'fs/promises'
 import { join } from 'path'
 import type { TelegramAction } from '../lib/types'
 import type { AuthService } from '../services/auth.service'
+import { tryCatch } from '../lib/try_catch'
 
 export class DownloadVideoAction implements TelegramAction {
   public static readonly slug = 'v1.download_stream_video'
@@ -40,11 +41,11 @@ export class DownloadVideoAction implements TelegramAction {
     })()
 
     if (!downloadLink) {
-      this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' })
+      await tryCatch(this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' }))
       return
     }
 
-    this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👀' })
+    await tryCatch(this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👀' }))
 
     const linkHash = hashString(downloadLink.link)
     const path = join(getPath().downloads, 'video', linkHash)
@@ -70,13 +71,20 @@ export class DownloadVideoAction implements TelegramAction {
         withExtension: false
       })
       if (!file) {
-        this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' })
+        await tryCatch(this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' }))
         return
       }
     }
 
     console.log(file)
-    await this.tg.sendMedia(envelope.msg.chat.id, InputMedia.video(`file://${file}`, { supportsStreaming: true, caption: 'Here you go' }), { replyTo: downloadLink.msgId })
+
+    await tryCatch(
+      this.tg.sendMedia(envelope.msg.chat.id, InputMedia.video(`file://${file}`, { supportsStreaming: true, caption: 'Here you go' }), {
+        // replyTo: downloadLink.msgId,
+        // mustReply: false
+      })
+    )
+
     this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👍' })
     return
   }

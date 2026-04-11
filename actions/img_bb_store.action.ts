@@ -8,7 +8,7 @@ import type { AuthService } from '../services/auth.service'
 
 export class ImgBBStoreAction implements TelegramAction {
   public static readonly slug = 'v1.img_bb_store'
-  public static readonly command = ['.imgbb', '.steal']
+  public static readonly command = ['.imgbb', '.steal', '.yoink']
   public static readonly meta = { description: 'Upload an imgbb. Hahahaha' }
 
   constructor(

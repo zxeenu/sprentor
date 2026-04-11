@@ -9,9 +9,13 @@ import { ImgBBStoreAction } from './actions/img_bb_store.action'
 import { createEnvelope } from './lib/envelope'
 import { registerControllers } from './lib/register_controller'
 import { createRouter, type Envelope } from './lib/router'
+import { tryCatch } from './lib/try_catch'
 import type { SlugString } from './lib/types'
 import { AuthService } from './services/auth.service'
+import { ConfigService } from './services/config.service'
 import { EventEmitter, type CommandDispatch, type CommandFailed, type CommandSucceeded, type DomainEvent, type TelegramMessageReceived } from './services/event_emitter.service'
+import { GrantAction } from './actions/grant.action'
+import { RevokeAction } from './actions/revoke.action'
 
 const TelegramMessageReceived = (env: Envelope): TelegramMessageReceived => ({
   type: 'telegram.message.received',
@@ -36,7 +40,9 @@ const router = createRouter()
 const REGISTERED_ACTIONS = [
   { cls: ImgBBStoreAction, deps: [TelegramClient, AuthService] },
   { cls: ImageBBGetAction, deps: [TelegramClient, AuthService] },
-  { cls: DownloadVideoAction, deps: [TelegramClient, AuthService] }
+  { cls: DownloadVideoAction, deps: [TelegramClient, AuthService] },
+  { cls: GrantAction, deps: [ConfigService, AuthService] },
+  { cls: RevokeAction, deps: [ConfigService, AuthService] }
 ]
 
 // -----------------------------
@@ -59,6 +65,10 @@ const COMMAND_HANDLERS: Record<string, SlugString> = REGISTERED_ACTIONS.reduce((
 }, {})
 console.log(COMMAND_HANDLERS)
 
+// Configs
+const config = new ConfigService()
+config.setCommandHandlers(COMMAND_HANDLERS)
+
 // -----------------------------
 // Telegram client
 // -----------------------------
@@ -79,6 +89,8 @@ const eventBus$ = new Subject<DomainEvent>()
 router.registerSingleton(AuthService)
 router.registerDependency(EventEmitter, 'singleton', () => new EventEmitter(eventBus$))
 router.registerDependency(TelegramClient, 'singleton', () => tg)
+router.registerDependency(ConfigService, 'singleton', () => config)
+
 // request scope dep resolution is broken. fix later
 
 // -----------------------------
@@ -116,8 +128,10 @@ router.registerErrorHandler((obj) => {
 const dispatch$ = eventBus$.pipe(
   filter((e): e is CommandDispatch => e.type === 'command.dispatch'),
   mergeMap(async (e) => {
-    const result = await router.dispatch(e.payload.route, e.payload.env)
-    if (!result.success) {
+    const { data, error } = await tryCatch(router.dispatch(e.payload.route, e.payload.env))
+    // const result = await router.dispatch(e.payload.route, e.payload.env)
+    if (error) {
+      console.error(error)
       return CommandFailed(e.payload.env, e.payload.env.errors)
     }
     return CommandSucceeded(e.payload.env)
