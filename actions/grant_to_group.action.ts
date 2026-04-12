@@ -53,7 +53,7 @@ export class GrantToGroupAction implements TelegramAction {
       }
 
       const userId = chatMember.user.id
-      const userName = chatMember.user.username
+      const userName = chatMember.user.username ?? null
 
       const existingGrant = await this.prisma.chatAccessGrant.findFirst({
         where: {

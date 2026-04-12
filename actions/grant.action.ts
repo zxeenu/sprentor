@@ -27,7 +27,7 @@ export class GrantAction implements TelegramAction {
     // console.log(envelope.msg)
     const chatId = envelope.msg.chat.id
     const replyTo = await envelope.msg.getReplyTo()
-    const userName = replyTo?.sender.username
+    const userName = replyTo?.sender.username ?? null
     const userId = replyTo?.sender.id
 
     const senderId = envelope.msg.sender.id
@@ -40,11 +40,6 @@ export class GrantAction implements TelegramAction {
     }
 
     if (!userId) {
-      this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' })
-      return
-    }
-
-    if (!userName) {
       this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' })
       return
     }
