@@ -16,7 +16,7 @@ export function getTelegramMsgPolicyData(msg: Message) {
   const userName = msg.sender.username
   const userId = msg.sender.id
 
-  if (!userName) {
+  if (!userId) {
     return null
   }
 

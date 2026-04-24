@@ -54,7 +54,6 @@ export class GrantAction implements TelegramAction {
       where: {
         action_slug: actionSlug,
         granted_chat_id: String(chatId),
-        granted_user_name: userName,
         granted_user_id: String(userId),
         deleted_at: null
       }

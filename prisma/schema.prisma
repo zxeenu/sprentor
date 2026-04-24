@@ -24,4 +24,5 @@ model ChatAccessGrant {
   deleted_at         DateTime?
   deleted_by_user_id DateTime?
   updated_at         DateTime  @updatedAt
+  remarks            String?
 }

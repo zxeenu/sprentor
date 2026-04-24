@@ -3,6 +3,7 @@ import type { MessageContext } from '@mtcute/dispatcher'
 export type Envelope = {
   [key: string]: any
   username: string
+  userId: number | null
   messageText: string
   msg?: MessageContext
   isAuthorized: boolean

@@ -8,6 +8,7 @@ export function createEnvelope(data?: { [key: string]: any }): Envelope {
     isCommand: data?.text.startsWith('.'),
     isAdmin: false,
     username: '',
+    userId: null,
     messageText: '',
     failed: false,
     isAuthorized: false,
