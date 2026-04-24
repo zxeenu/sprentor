@@ -9,6 +9,7 @@ import type { TelegramAction } from '../lib/types'
 import type { AuthService } from '../services/auth.service'
 import { tryCatch } from '../lib/try_catch'
 import type { PrismaClient } from '../lib/generated/prisma/client'
+import { sleep } from 'bun'
 
 export class DownloadVideoAction implements TelegramAction {
   public static readonly slug = 'v1.download_stream_video'
@@ -84,16 +85,33 @@ export class DownloadVideoAction implements TelegramAction {
 
     // --- download if folder empty or doesn't exist ---
     if (!file) {
-      file = await downloadMediaObject(downloadLink.link, {
-        dir: path,
-        filename: linkHash,
-        type: 'video',
-        withExtension: false
-      })
-      if (!file) {
-        await tryCatch(this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' }))
-        return
+      const RETRY_LIMIT = 3
+      for (let i = 1; i <= RETRY_LIMIT; i++) {
+        console.log(`Attempt download ${i} | Link: ${downloadLink.link}`)
+        const result = await tryCatch(
+          downloadMediaObject(downloadLink.link, {
+            dir: path,
+            filename: linkHash,
+            type: 'video',
+            withExtension: false
+          })
+        )
+
+        if (!result.error) {
+          file = result.data
+
+          break
+        }
+
+        console.warn(`Failed download ${i} | Link: ${downloadLink.link} | next attempt after 1 second`)
+        console.warn(result.error)
+        await sleep(1000)
       }
+    }
+
+    if (!file) {
+      await tryCatch(this.tg.sendReaction({ message: envelope.msg.id, chatId: envelope.msg.chat.id, emoji: '👎' }))
+      return
     }
 
     console.log(file)
