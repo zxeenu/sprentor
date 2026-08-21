@@ -18,11 +18,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY package.json bun.lockb* ./
 RUN bun install --frozen-lockfile
 
-# Copy the rest of the app (includes prisma/schema.prisma)
+# Copy the rest of the app (includes prisma/schema.prisma + migrations)
 COPY . .
 
-# Generate Prisma client
+# DATABASE_URL passed in at build time from .env.docker (via compose build args)
+ARG DATABASE_URL
+ENV DATABASE_URL=${DATABASE_URL}
+
+# Create the DB at build time by applying migrations, then generate the client
+RUN bunx prisma migrate deploy
 RUN bunx prisma generate
 
-# Run migrations, then start the app
+# Re-run migrations at container start (idempotent), then start the app
 CMD bunx prisma migrate deploy && bun run index.ts
