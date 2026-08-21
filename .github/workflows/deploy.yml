@@ -1,0 +1,14 @@
+name: Deploy Sprentor
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # lets you trigger it manually from the Actions tab too
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, Linux, X64]
+
+    steps:
+      - name: Run deploy script
+        run: ~/deploy_sprentor.sh
