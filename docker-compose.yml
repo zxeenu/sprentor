@@ -5,7 +5,7 @@ services:
     env_file:
       - .env.docker
     volumes:
-      - ${DB_PATH}:/app/prisma
+      - ${DB_PATH}:/app/prisma/data
       - ${DOWNLOADS_PATH}:/app/downloads
     networks:
       - shared
