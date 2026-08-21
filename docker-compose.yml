@@ -5,15 +5,11 @@ services:
     env_file:
       - .env.docker
     volumes:
-      - db_data:/app/prisma
-      - downloads:/app/downloads
+      - ${DB_PATH}:/app/prisma
+      - ${DOWNLOADS_PATH}:/app/downloads
     networks:
       - shared
     restart: unless-stopped
-
-volumes:
-  db_data:
-  downloads:
 
 networks:
   shared:
