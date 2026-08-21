@@ -1,0 +1,20 @@
+#!/bin/sh
+set -e
+ENV_FILE=".env"
+if [ ! -f "$ENV_FILE" ]; then
+  echo "Error: $ENV_FILE not found. Create it first with DB_PATH, DOWNLOADS_PATH, and DATA_PATH set."
+  exit 1
+fi
+# Load variables from .env
+export $(grep -v '^#' "$ENV_FILE" | grep -v '^$' | xargs)
+if [ -z "$DB_PATH" ] || [ -z "$DOWNLOADS_PATH" ] || [ -z "$DATA_PATH" ]; then
+  echo "Error: DB_PATH, DOWNLOADS_PATH, or DATA_PATH is empty in $ENV_FILE"
+  exit 1
+fi
+echo "Creating: $DB_PATH"
+mkdir -p "$DB_PATH"
+echo "Creating: $DOWNLOADS_PATH"
+mkdir -p "$DOWNLOADS_PATH"
+echo "Creating: $DATA_PATH/session"
+mkdir -p "$DATA_PATH/session"
+echo "Done. Folders ready."

@@ -82,7 +82,8 @@ config.setCommandHandlers(COMMAND_HANDLERS)
 // -----------------------------
 const tg = new TelegramClient({
   apiId: process.env.TELEGRAM_API_ID! as any,
-  apiHash: process.env.TELEGRAM_API_HASH! as any
+  apiHash: process.env.TELEGRAM_API_HASH! as any,
+  storage: process.env.TELEGRAM_SESSION_PATH ?? './data/session/client.session'
 })
 const dp = Dispatcher.for(tg)
 

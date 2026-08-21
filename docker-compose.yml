@@ -1,0 +1,18 @@
+services:
+  app:
+    container_name: sprentor
+    build: .
+    env_file:
+      - .env.docker
+    volumes:
+      - ${DB_PATH}:/app/prisma/data
+      - ${DOWNLOADS_PATH}:/app/downloads
+      - ${DATA_PATH}:/app/data
+    networks:
+      - shared
+    restart: unless-stopped
+
+networks:
+  shared:
+    name: home-server-setup_default
+    external: true
