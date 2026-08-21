@@ -45,4 +45,4 @@ bunx --bun prisma generate
 ```
 
 Test Count
-1
+2
