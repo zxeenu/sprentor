@@ -21,9 +21,9 @@ RUN bun install --frozen-lockfile
 # Copy the rest of the app (includes prisma/schema.prisma + migrations)
 COPY . .
 
-# DATABASE_URL passed in at build time from .env.docker (via compose build args)
-ARG DATABASE_URL
-ENV DATABASE_URL=${DATABASE_URL}
+# Build-time DB URL, just so Prisma has something to resolve.
+# Overridden at runtime by the real value in .env.docker.
+ENV DATABASE_URL="file:./prisma/dev.db"
 
 # Create the DB at build time by applying migrations, then generate the client
 RUN bunx prisma migrate deploy

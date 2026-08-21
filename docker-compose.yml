@@ -1,10 +1,7 @@
 services:
   app:
     container_name: sprentor
-    build:
-      context: .
-      args:
-        DATABASE_URL: ${DATABASE_URL}
+    build: .
     env_file:
       - .env.docker
     volumes:
