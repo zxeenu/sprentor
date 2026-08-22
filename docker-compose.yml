@@ -14,5 +14,5 @@ services:
 
 networks:
   shared:
-    name: home-server-setup_default
+    name: home-server-net
     external: true
