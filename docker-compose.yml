@@ -1,16 +1,33 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   app:
     container_name: sprentor
+    logging: *default-logging
     build: .
+
     env_file:
       - .env.docker
+
     volumes:
       - ${DB_PATH}:/app/prisma/data
       - ${DOWNLOADS_PATH}:/app/downloads
       - ${DATA_PATH}:/app/data
+
     networks:
       - shared
+
     restart: unless-stopped
+
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 1G
 
 networks:
   shared:
